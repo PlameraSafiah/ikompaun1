@@ -1,0 +1,75 @@
+
+'schedule untuk hantar emel alert iklan yg akan tamat tempoh dlm masa sebulan dr sysdate
+'ikashaari 22022016
+	
+	Set objConn = CreateObject("ADODB.Connection")
+	objconn.Open "Driver={Microsoft ODBC for Oracle};Server=mpsp12c;uid=majlis;pwd=majlis;"
+
+x = " select to_char(sysdate,'ddmmyyyy') timeni from dual "
+set obx = objConn.execute(x)
+	tkhsis = obx("timeni")
+	
+	sa = 	  " select pengiklan,no_akaun,no_fail,to_char(tkh_mula,'dd/mm/yyyy') tkh_mula,nvl(amaun,0) as am, "
+   	sa = sa & " to_char(tkh_tamat,'dd/mm/yyyy') tkh_tamat,to_char(sysdate,'mmyyyy') tkhsys"
+   	sa = sa & " from jurutera.permohonan_iklan "
+    	sa = sa & " where tkh_tamat between to_date('"&tkhsis&"','ddmmyyyy') and add_months(to_date('"&tkhsis&"','ddmmyyyy'),1) "
+	sa = sa & " and flag_emel is null order by no_akaun"
+	
+	set objrs1 = objconn.execute(sa) 
+
+	strBody = strBody & "Tuan, " &  vbCrLf & "<br/>"
+	strBody = strBody & "Berikut adalah senarai iklan yang akan tamat dalam tempoh satu bulan : " & vbCrLf & "<br/>"
+
+	bil = 0
+	
+	do while not objrs1.eof
+			bil = bil + 1
+			no_fail = objrs1("no_fail")
+			no_akaun = objrs1("no_akaun")
+			tkh_mula = objrs1("tkh_mula")
+			tkh_tamat = objrs1("tkh_tamat")
+    		tkhsys = objrs1("tkhsys")
+			pengiklan = objrs1("pengiklan")
+			amaun = objrs1("am")
+		
+			q =     "select initcap(nama) nama from jurutera.pengiklan where kod = '"& pengiklan &"' "
+     		set rsq = objconn.execute(q)
+     
+     		if not rsq.eof then
+        		nama = rsq("nama")
+			end if
+			
+		pemohon = nama
+
+       strBody = strBody & pemohon & vbCrLf & ""
+				
+
+		objrs1.movenext
+	loop	
+	
+	strBody = strBody & "" & "Sekian, terima kasih. " &  vbCrLf & ""
+
+' ------------------- hantar emel --------------------------------------------------------
+								
+					' setting utk emel
+					theSchema="http://schemas.microsoft.com/cdo/configuration/"
+					Set cdoConfig=CreateObject("CDO.Configuration")
+					cdoConfig.Fields.Item(theSchema & "sendusing")= 2
+					cdoConfig.Fields.Item(theSchema & "smtpserver")="mail.mpsp.gov.my"'IP address of smtp server
+					cdoConfig.Fields.Update
+					Set cdoMessage=CreateObject("CDO.Message")
+					cdoMessage.Configuration=cdoConfig
+					cdoMessage.From= "Kejuruteraan MPSP <kej@mpsp.gov.my>"
+					'cdoMessage.To= "rosnani@mpsp.gov.my;mohamadhazrul@mpsp.gov.my;zulkefli@mpsp.gov.my;"
+					cdoMessage.To= "afizah@mpsp.gov.my;"
+					cdoMessage.Subject= "Senarai Pengiklan Yang Akan Tamat Tempoh"
+					cdoMessage.TextBody= strBody
+					cdoMessage.Send
+					Set cdoMessage=Nothing
+					Set cdoConfig=Nothing
+			
+'---------------------------------------------------------------------------------------------------------------
+	j3 = " update jurutera.permohonan_iklan set flag_emel = 'Y' where tkh_tamat between to_date('"&tkhsis&"','ddmmyyyy') and add_months(to_date('"&tkhsis&"','ddmmyyyy'),1)  "
+	set obj3 = objConn.execute(j3)
+
+
